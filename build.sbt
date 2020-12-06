@@ -11,9 +11,9 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scalatest" %% "scalatest-shouldmatchers" % "3.2.0" % "test",
   "com.typesafe.play" %% "play-json" % "2.8.1",
-  "com.syedatifakhtar.scalaterraform" %% "scalaterraform" %"0.4-SNAPSHOT",
+  "com.syedatifakhtar.scalaterraform" %% "scalaterraform" %"0.5-SNAPSHOT",
   "com.typesafe" % "config" % "1.4.0"
 )
-resolvers += "Artima Maven Repository" at "https://repo.artima.com/releases"
+resolvers += "Sonatype Maven Repository" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 run := Defaults.runTask(fullClasspath in Runtime, mainClass in run in Compile, runner in run).evaluated

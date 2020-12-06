@@ -18,8 +18,9 @@ object Application {
     val argsMap = ArgsParser.parse(args)
     println("Got args:\n")
     argsMap.foreach(println)
+
     val pipelinesAvailable = PipelineBuilder.getPipelines(argsMap(ArgsParser.TASKNAME))
-    pipelinesAvailable(argsMap(ArgsParser.PIPELINENAME)).execute.get
+    pipelinesAvailable(argsMap(ArgsParser.PIPELINENAME)).apply().execute.get
   }
 
 }

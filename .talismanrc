@@ -1,3 +1,11 @@
 fileignoreconfig:
 - filename: src/main/resources/conf/platform.conf
   checksum: b475a8dab4b5102197ddd7cad5592bd1268355cddee3dab86db3a0e0811faee0
+- filename: src/main/resources/conf/platform.conf
+  checksum: 9626e4ee56119e632f10cbc996d10059fb882bfc239125ddfbb1fe61316b93fb
+- filename: src/main/resources/terraform/platform_deltalake/emr.tf
+  checksum: bd70332b22ee3d5762461e8b886cbf83f9c77dda08e5a9e548ed9728ba3c6bb6
+- filename: src/main/scala/com/techradar/dataplatform/PipelineBuilder.scala
+  checksum: a220f78d5360e26fb88a11e0dc3666d0ef33a7709404fb1459d710a6b6db66f5
+- filename: src/main/resources/terraform/platform_deltalake/iam.tf
+  checksum: ca33faec4b51a929981bc4b7ae6ac108dd007d9262eb141c90d9bb84415f232f

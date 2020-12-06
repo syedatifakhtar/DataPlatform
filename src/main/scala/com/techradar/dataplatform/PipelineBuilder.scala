@@ -1,10 +1,13 @@
 package com.techradar.dataplatform
 
-import com.syedatifakhtar.pipelines.Pipelines.Pipeline
+import java.io.{ByteArrayOutputStream, File, PrintWriter}
+
+import com.syedatifakhtar.pipelines.Pipelines.{Pipeline, StepOutput, UnitStep}
 import com.syedatifakhtar.scalaterraform.TerraformPipelines.TerraformStep
 import com.syedatifakhtar.scalaterraform.{DefaultConfigArgsResolver, TerraformModule, TerraformPipelines}
 import com.typesafe.config.{Config, ConfigFactory}
 
+import scala.sys.process.Process
 import scala.util.Try
 
 object PipelineBuilder {
@@ -26,6 +29,7 @@ object PipelineBuilder {
           .toMap
       }.toOption
   }
+
   private val configTree = "techradar-data-platform.infra"
 
   private def configResolverBuilder = DefaultConfigArgsResolver(configValueResolver)(configTree) _
@@ -33,34 +37,91 @@ object PipelineBuilder {
   val srcDir = s"${this.getClass.getClassLoader().getResource("terraform").getPath}"
   val buildDir = s"${this.getClass.getClassLoader().getResource("terraform").getPath}/build"
 
-  private def buildPipelineMap(pipelines: Pipeline*): Map[String, Pipeline] = {
-    pipelines.map { p => p.name -> p }.toMap
-  }
-
   def getModule(moduleName: String) = {
-    TerraformModule(srcDir, buildDir)(moduleName)(configResolverBuilder(moduleName))
+    TerraformModule(srcDir, buildDir)(moduleName)(configResolverBuilder(moduleName)(None))
   }
 
-  def getPipelines(command: String): Map[String, Pipeline] = {
+  def getModuleWithOverrideValues(moduleName: String, overrides: => Map[String, Map[String, String]]) = {
+    TerraformModule(srcDir, buildDir)(moduleName)(configResolverBuilder(moduleName)(Some(overrides)))
+  }
+
+
+  def saveEMRSSHKey(keyOutput: String, masterNodeDNS: String) = {
+    val credentialsDir = s"${buildDir}/.keys"
+    val credsDir = new File(credentialsDir)
+    if(!credsDir.exists()) {
+      credsDir.mkdirs()
+    }
+    val sshKeyLocation = s"$credentialsDir/masterNodeKey.pem"
+    val writer = new PrintWriter(sshKeyLocation) {
+      write(keyOutput);
+      close()
+    }
+    Process(s"chmod -R 700 $credentialsDir/masterNodeKey.pem").!!
+    if(writer.checkError()) throw new Exception("Failed to write emr ssh key!")
+    println(s"Key written to ${sshKeyLocation}")
+    println(s"You may now ssh to master node using: ssh -i ${sshKeyLocation} hadoop@${masterNodeDNS}")
+    println(s"You may now connect to zeppelin using ssh hadoop@${masterNodeDNS} -i ${sshKeyLocation} -L 8890:127.0.0.1:8890 ")
+  }
+
+  def getPipelines(command: String) = {
     val accountStep = TerraformStep(getModule("account")) _
     val environmentStep = TerraformStep(getModule("environment")) _
-    val platformModule = getModule("platform")
-    val platformStep = TerraformStep(platformModule) _
-    val accountPipeline = TerraformPipelines
-      .TerraformPipeline
-      .empty("account", command) ->
-      accountStep
-    val environmentPipeline = TerraformPipelines
-      .TerraformPipeline
-      .empty("environment", command) ->
-      environmentStep
-    val allInfra = TerraformPipelines
-      .TerraformPipeline
-      .empty("all_infra", command) ->
-      platformStep
+
+    lazy val platformDeltaLakeModule = getModuleWithOverrideValues("platform_deltalake", {
+      lazy val environmentOutput = getModule("environment").output
+      Map(
+        "vars" -> Map(
+          "main_subnet_id" -> environmentOutput.get("subnet_id"),
+          "security_group_id" -> environmentOutput.get("security_group_id")
+        )
+      )
+    })
+
+    lazy val platformDeltaLakeStep = TerraformStep(platformDeltaLakeModule) _
+    lazy val accountPipeline = { () =>
+      TerraformPipelines
+        .TerraformPipeline
+        .empty("account", command) ->
+        accountStep
+    }
+    lazy val generateEMRKey = { () =>
+      TerraformPipelines.TerraformPipeline.empty("generateEMRKey", "") ->
+        UnitStep("Fetch EMR Key") {
+          pc =>
+            val emrOutput = platformDeltaLakeModule.output
+            saveEMRSSHKey(emrOutput.get("emr_ssh_key"), emrOutput.get("emr_master_node_dns"))
+            Map.empty[String, String]
+        }
+    }
+    lazy val environmentPipeline = { () =>
+      TerraformPipelines
+        .TerraformPipeline
+        .empty("environment", command) ->
+        environmentStep
+    }
+    lazy val platformDeltaLakePipeline = { () =>
+      TerraformPipelines.TerraformPipeline.empty("platform_deltalake", command) ->
+        platformDeltaLakeStep
+    }
+    lazy val allInfra = {
+      { () =>
+        println("All Infra step called!")
+        TerraformPipelines
+          .TerraformPipeline
+          .empty("all_infra", command) ->
+          environmentStep ->
+          platformDeltaLakeStep
+      }
+    }
 
 
-    buildPipelineMap(accountPipeline,environmentPipeline)
+    val pipelineMap: Map[String, () => Pipeline] = Map("account" -> accountPipeline
+      , "environment" -> environmentPipeline
+      , "platformDeltaLake" -> platformDeltaLakePipeline
+      , "generateEMRKey" -> generateEMRKey
+    )
+    pipelineMap
   }
 
 }

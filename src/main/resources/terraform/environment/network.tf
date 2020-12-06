@@ -1,5 +1,5 @@
 resource "aws_security_group" "allow_access" {
-  name        = "allow_access_techradar_demo"
+  name        = "allow_access_techradar_demo_${var.deployment_identifier}"
   description = "Allow inbound traffic"
   vpc_id      = aws_vpc.main.id
 
@@ -32,20 +32,22 @@ resource "aws_security_group" "allow_access" {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block           = "168.31.0.0/16"
+  cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
   tags = {
     name = "techradar_demo"
+    deployment_identifier = var.deployment_identifier
     owner = var.owner
   }
 }
 
 resource "aws_subnet" "main" {
   vpc_id     = aws_vpc.main.id
-  cidr_block = "168.31.0.0/20"
+  cidr_block = "10.0.0.0/20"
 
   tags = {
     name = "techradar_demo"
+    deployment_identifier = var.deployment_identifier
     owner = var.owner
   }
 }
