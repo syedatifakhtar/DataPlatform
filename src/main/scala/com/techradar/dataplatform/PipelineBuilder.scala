@@ -1,8 +1,8 @@
 package com.techradar.dataplatform
 
-import java.io.{ByteArrayOutputStream, File, PrintWriter}
+import java.io.{File, PrintWriter}
 
-import com.syedatifakhtar.pipelines.Pipelines.{Pipeline, StepOutput, UnitStep}
+import com.syedatifakhtar.pipelines.Pipelines.{MultiSequencePipeline, Pipeline, UnitStep}
 import com.syedatifakhtar.scalaterraform.TerraformPipelines.TerraformStep
 import com.syedatifakhtar.scalaterraform.{DefaultConfigArgsResolver, TerraformModule, TerraformPipelines}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -49,7 +49,7 @@ object PipelineBuilder {
   def saveEMRSSHKey(keyOutput: String, masterNodeDNS: String) = {
     val credentialsDir = s"${buildDir}/.keys"
     val credsDir = new File(credentialsDir)
-    if(!credsDir.exists()) {
+    if (!credsDir.exists()) {
       credsDir.mkdirs()
     }
     val sshKeyLocation = s"$credentialsDir/masterNodeKey.pem"
@@ -58,7 +58,7 @@ object PipelineBuilder {
       close()
     }
     Process(s"chmod -R 700 $credentialsDir/masterNodeKey.pem").!!
-    if(writer.checkError()) throw new Exception("Failed to write emr ssh key!")
+    if (writer.checkError()) throw new Exception("Failed to write emr ssh key!")
     println(s"Key written to ${sshKeyLocation}")
     println(s"You may now ssh to master node using: ssh -i ${sshKeyLocation} hadoop@${masterNodeDNS}")
     println(s"You may now connect to zeppelin using ssh hadoop@${masterNodeDNS} -i ${sshKeyLocation} -L 8890:127.0.0.1:8890 ")
@@ -72,11 +72,23 @@ object PipelineBuilder {
       lazy val environmentOutput = getModule("environment").output
       Map(
         "vars" -> Map(
-          "main_subnet_id" -> environmentOutput.get("subnet_id"),
+          "main_subnet_id" -> environmentOutput.get("subnet_public_1_id"),
           "security_group_id" -> environmentOutput.get("security_group_id")
         )
       )
     })
+
+    lazy val platformDremioModule = getModuleWithOverrideValues("platform_dremio", {
+      lazy val environmentOutput = getModule("environment").output
+      Map(
+        "vars" -> Map(
+          "eks_subnet_ids" -> s"${environmentOutput.get("subnet_private_1_id")},${environmentOutput.get("subnet_private_2_id")}",
+          "security_group_ids" -> environmentOutput.get("security_group_id")
+        )
+      )
+    })
+
+    lazy val platformDremioStep = TerraformStep(platformDremioModule) _
 
     lazy val platformDeltaLakeStep = TerraformStep(platformDeltaLakeModule) _
     lazy val accountPipeline = { () =>
@@ -102,16 +114,23 @@ object PipelineBuilder {
     }
     lazy val platformDeltaLakePipeline = { () =>
       TerraformPipelines.TerraformPipeline.empty("platform_deltalake", command) ->
-        platformDeltaLakeStep
+        platformDeltaLakeStep ->
+        generateEMRKey
+    }
+
+    lazy val platformDremioPipeline = { () =>
+      TerraformPipelines.TerraformPipeline.empty("platform_dremio", command) ->
+        platformDremioStep
     }
     lazy val allInfra = {
       { () =>
         println("All Infra step called!")
-        TerraformPipelines
-          .TerraformPipeline
-          .empty("all_infra", command) ->
-          environmentStep ->
-          platformDeltaLakeStep
+        MultiSequencePipeline
+          .empty("all_infra") ->
+          environmentPipeline ->
+          platformDeltaLakePipeline ->
+          generateEMRKey ->
+          platformDremioPipeline
       }
     }
 
@@ -120,6 +139,7 @@ object PipelineBuilder {
       , "environment" -> environmentPipeline
       , "platformDeltaLake" -> platformDeltaLakePipeline
       , "generateEMRKey" -> generateEMRKey
+      , "allInfra" -> allInfra
     )
     pipelineMap
   }

@@ -17,7 +17,7 @@ resource "aws_security_group" "allow_access" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  depends_on = [aws_subnet.main]
+  depends_on = [aws_subnet.private_1,aws_subnet.private_2,aws_subnet.public_1,aws_subnet.public_2]
 
   lifecycle {
     ignore_changes = [
@@ -41,9 +41,58 @@ resource "aws_vpc" "main" {
   }
 }
 
-resource "aws_subnet" "main" {
+data "aws_availability_zones" "opted_in" {
+  all_availability_zones = true
+
+  filter {
+    name   = "opt-in-status"
+    values = ["not-opted-in", "opted-in"]
+  }
+}
+
+resource "aws_subnet" "public_1" {
   vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.0.0/20"
+  cidr_block = "10.0.0.0/22"
+  availability_zone = data.aws_availability_zones.opted_in.names[0]
+
+  tags = {
+    name = "techradar_demo"
+    deployment_identifier = var.deployment_identifier
+    owner = var.owner
+  }
+}
+
+resource "aws_subnet" "public_2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.4.0/22"
+  availability_zone = data.aws_availability_zones.opted_in.names[1]
+
+  tags = {
+    name = "techradar_demo"
+    deployment_identifier = var.deployment_identifier
+    owner = var.owner
+  }
+}
+
+
+resource "aws_subnet" "private_1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.8.0/22"
+  availability_zone = data.aws_availability_zones.opted_in.names[0]
+  map_public_ip_on_launch = false
+
+  tags = {
+    name = "techradar_demo"
+    deployment_identifier = var.deployment_identifier
+    owner = var.owner
+  }
+}
+
+resource "aws_subnet" "private_2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.12.0/22"
+  availability_zone = data.aws_availability_zones.opted_in.names[1]
+  map_public_ip_on_launch = false
 
   tags = {
     name = "techradar_demo"
