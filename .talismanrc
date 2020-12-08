@@ -13,3 +13,11 @@ fileignoreconfig:
   checksum: 9efcaf41a05f20d595b0aeb70cd46f2df033becc5117d9814ecad6f62fd87b35
 - filename: src/main/scala/com/techradar/dataplatform/PipelineBuilder.scala
   checksum: 7ab0d142d2750652fc1036861b82dc5ed721aded89f5cba75f4df1e163c8c986
+- filename: src/main/resources/terraform/platform_deltalake/emr.tf
+  checksum: bd70332b22ee3d5762461e8b886cbf83f9c77dda08e5a9e548ed9728ba3c6bb6
+- filename: src/main/resources/terraform/platform_deltalake/iam.tf
+  checksum: ca33faec4b51a929981bc4b7ae6ac108dd007d9262eb141c90d9bb84415f232f
+- filename: src/main/scala/com/techradar/dataplatform/PipelineBuilder.scala
+  checksum: 7ab0d142d2750652fc1036861b82dc5ed721aded89f5cba75f4df1e163c8c986
+- filename: src/main/resources/conf/platform.conf
+  checksum: 903421c978c0a4227c508394d997192c50fb1a4407e8c822ea6999e7c0057b6e
