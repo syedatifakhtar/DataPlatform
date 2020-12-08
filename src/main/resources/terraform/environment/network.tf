@@ -41,19 +41,14 @@ resource "aws_vpc" "main" {
   }
 }
 
-data "aws_availability_zones" "opted_in" {
-  all_availability_zones = true
-
-  filter {
-    name   = "opt-in-status"
-    values = ["not-opted-in", "opted-in"]
-  }
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
 resource "aws_subnet" "public_1" {
   vpc_id     = aws_vpc.main.id
   cidr_block = "10.0.0.0/22"
-  availability_zone = data.aws_availability_zones.opted_in.names[0]
+  availability_zone = data.aws_availability_zones.available.names[0]
 
   tags = {
     name = "techradar_demo"
@@ -65,7 +60,7 @@ resource "aws_subnet" "public_1" {
 resource "aws_subnet" "public_2" {
   vpc_id     = aws_vpc.main.id
   cidr_block = "10.0.4.0/22"
-  availability_zone = data.aws_availability_zones.opted_in.names[1]
+  availability_zone = data.aws_availability_zones.available.names[1]
 
   tags = {
     name = "techradar_demo"
@@ -78,7 +73,7 @@ resource "aws_subnet" "public_2" {
 resource "aws_subnet" "private_1" {
   vpc_id     = aws_vpc.main.id
   cidr_block = "10.0.8.0/22"
-  availability_zone = data.aws_availability_zones.opted_in.names[0]
+  availability_zone = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = false
 
   tags = {
@@ -91,7 +86,7 @@ resource "aws_subnet" "private_1" {
 resource "aws_subnet" "private_2" {
   vpc_id     = aws_vpc.main.id
   cidr_block = "10.0.12.0/22"
-  availability_zone = data.aws_availability_zones.opted_in.names[1]
+  availability_zone = data.aws_availability_zones.available.names[1]
   map_public_ip_on_launch = false
 
   tags = {

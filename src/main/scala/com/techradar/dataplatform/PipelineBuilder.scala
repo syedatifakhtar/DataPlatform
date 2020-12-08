@@ -82,14 +82,15 @@ object PipelineBuilder {
       lazy val environmentOutput = getModule("environment").output
       Map(
         "vars" -> Map(
-          "eks_subnet_ids" -> s"${environmentOutput.get("subnet_private_1_id")},${environmentOutput.get("subnet_private_2_id")}",
-          "security_group_ids" -> environmentOutput.get("security_group_id")
+          "private_subnet_ids" -> s"[${environmentOutput.get("subnet_private_1_id")},${environmentOutput.get("subnet_private_2_id")}]",
+          "public_subnet_ids" -> s"[${environmentOutput.get("subnet_public_1_id")},${environmentOutput.get("subnet_public_2_id")}]",
+          "security_group_ids" -> s"""[${environmentOutput.get("security_group_id")}]"""
         )
       )
     })
 
-    lazy val platformDremioStep = TerraformStep(platformDremioModule) _
 
+    lazy val platformDremioStep = TerraformStep(platformDremioModule) _
     lazy val platformDeltaLakeStep = TerraformStep(platformDeltaLakeModule) _
     lazy val accountPipeline = { () =>
       TerraformPipelines
@@ -97,14 +98,18 @@ object PipelineBuilder {
         .empty("account", command) ->
         accountStep
     }
+
+    val fetchEMRKeyStep = UnitStep("Fetch EMR Key") {
+      pc =>
+        val emrOutput = platformDeltaLakeModule.output
+        saveEMRSSHKey(emrOutput.get("emr_ssh_key"), emrOutput.get("emr_master_node_dns"))
+        Map.empty[String, String]
+    }
+
+
     lazy val generateEMRKey = { () =>
       TerraformPipelines.TerraformPipeline.empty("generateEMRKey", "") ->
-        UnitStep("Fetch EMR Key") {
-          pc =>
-            val emrOutput = platformDeltaLakeModule.output
-            saveEMRSSHKey(emrOutput.get("emr_ssh_key"), emrOutput.get("emr_master_node_dns"))
-            Map.empty[String, String]
-        }
+        fetchEMRKeyStep
     }
     lazy val environmentPipeline = { () =>
       TerraformPipelines
@@ -115,29 +120,27 @@ object PipelineBuilder {
     lazy val platformDeltaLakePipeline = { () =>
       TerraformPipelines.TerraformPipeline.empty("platform_deltalake", command) ->
         platformDeltaLakeStep ->
-        generateEMRKey
+        fetchEMRKeyStep
     }
 
     lazy val platformDremioPipeline = { () =>
       TerraformPipelines.TerraformPipeline.empty("platform_dremio", command) ->
         platformDremioStep
     }
-    lazy val allInfra = {
-      { () =>
-        println("All Infra step called!")
-        MultiSequencePipeline
-          .empty("all_infra") ->
-          environmentPipeline ->
-          platformDeltaLakePipeline ->
-          generateEMRKey ->
-          platformDremioPipeline
-      }
+
+    lazy val allInfra = { () =>
+      val pipeline = MultiSequencePipeline.empty("allInfra") |
+        environmentPipeline.apply() |
+        platformDeltaLakePipeline.apply() |
+        platformDremioPipeline.apply()
+      pipeline
     }
 
 
     val pipelineMap: Map[String, () => Pipeline] = Map("account" -> accountPipeline
       , "environment" -> environmentPipeline
       , "platformDeltaLake" -> platformDeltaLakePipeline
+      , "platformDremio" -> platformDremioPipeline
       , "generateEMRKey" -> generateEMRKey
       , "allInfra" -> allInfra
     )
