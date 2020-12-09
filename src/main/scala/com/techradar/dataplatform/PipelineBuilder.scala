@@ -82,9 +82,9 @@ object PipelineBuilder {
       lazy val environmentOutput = getModule("environment").output
       Map(
         "vars" -> Map(
-          "private_subnet_ids" -> s"[${environmentOutput.get("subnet_private_1_id")},${environmentOutput.get("subnet_private_2_id")}]",
-          "public_subnet_ids" -> s"[${environmentOutput.get("subnet_public_1_id")},${environmentOutput.get("subnet_public_2_id")}]",
-          "security_group_ids" -> s"""[${environmentOutput.get("security_group_id")}]"""
+          "private_subnet_ids" -> s"""["${environmentOutput.get("subnet_private_1_id")}","${environmentOutput.get("subnet_private_2_id")}"]""",
+          "public_subnet_ids" -> s"""["${environmentOutput.get("subnet_public_1_id")}","${environmentOutput.get("subnet_public_2_id")}"]""",
+          "security_group_ids" -> s"""["${environmentOutput.get("security_group_id")}"]"""
         )
       )
     })
@@ -105,6 +105,7 @@ object PipelineBuilder {
         saveEMRSSHKey(emrOutput.get("emr_ssh_key"), emrOutput.get("emr_master_node_dns"))
         Map.empty[String, String]
     }
+
 
 
     lazy val generateEMRKey = { () =>

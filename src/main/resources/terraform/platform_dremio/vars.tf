@@ -5,7 +5,7 @@ variable "eks-cw-logging" {
     "authenticator",
     "controllerManager",
     "scheduler"]
-  type = list(string)
+  type = "list"
   description = "Enable EKS CWL for EKS components"
 }
 
@@ -19,17 +19,17 @@ variable "k8s-version" {
 }
 
 variable "security_group_ids" {
-  type = list(string)
+  type = "list"
 }
 
 
 variable "private_subnet_ids" {
-  type = list(string)
+  type = "list"
 }
-variable "public_subnet_ids" {}
-variable "ip_whitelist" {
-  type = list(string)
+variable "public_subnet_ids" {
+  type = "list"
 }
+
 
 variable "kubeconfig_aws_authenticator_env_variables" {
   description = "Environment variables that should be used when executing the authenticator. e.g. { AWS_PROFILE = \"eks\"}."
